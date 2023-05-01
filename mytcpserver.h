@@ -5,7 +5,6 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QVector>
-#include "datagenerator.h"
 
 class MyTcpServer : public QTcpServer
 {
@@ -15,7 +14,6 @@ public:
     QTcpSocket * Socket;
 
 private:
-    DataGenerator Generator;
 
     QVector <QTcpSocket*> sockets;
     QByteArray Data;

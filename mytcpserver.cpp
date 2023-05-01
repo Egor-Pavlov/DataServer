@@ -64,8 +64,6 @@ void MyTcpServer::slotReadyRead()
             QString str;
             input >> str;
             qDebug() << str;
-
-            Generator.GenerateCoordinate();
             //qDebug()<<Generator.createJsonData();
 
             // Создаем подключение к базе данных PostgreSQL
@@ -88,7 +86,7 @@ void MyTcpServer::slotReadyRead()
 
 
 
-            SendToClient(Generator.createJsonData(), socketDescriptor);
+            SendToClient("", socketDescriptor);
             break;
         }
     }
