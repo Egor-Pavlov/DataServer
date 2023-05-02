@@ -34,6 +34,43 @@ void MyTcpServer::incomingConnection(qintptr socketDescriptor)
     qDebug() << "connected " << Socket->socketDescriptor();
 }
 
+QString MyTcpServer::getLatestCoords(int roomId)
+{
+    QSqlDatabase db = QSqlDatabase::database(); // получаем активное подключение к базе данных
+
+    // запрос для получения самых свежих координат каждого устройства с фильтрацией по room_id
+    QString queryStr = "SELECT DISTINCT ON (device_id) "
+                       "devices.mac_address, devices.name, coordinates.x, coordinates.y, coordinates.room_id, coordinates.timestamp "
+                       "FROM coordinates "
+                       "JOIN devices ON coordinates.device_id = devices.id "
+                       "WHERE coordinates.room_id = :roomId "
+                       "ORDER BY device_id, timestamp DESC;";
+
+    QSqlQuery query(db);
+    query.prepare(queryStr);
+    query.bindValue(":roomId", roomId);
+    query.exec();
+
+    QJsonArray coordsArray;
+    while (query.next())
+    {
+        QJsonObject coordObject;
+        coordObject.insert("mac", query.value(0).toString());
+        coordObject.insert("name", query.value(1).toString());
+        coordObject.insert("x", query.value(2).toDouble());
+        coordObject.insert("y", query.value(3).toDouble());
+//        coordObject.insert("roomId", query.value(4).toInt());
+        coordObject.insert("dateTime", query.value(5).toDateTime().toString(Qt::ISODate));
+        coordsArray.append(coordObject);
+    }
+
+    QJsonObject resultObject;
+    resultObject.insert("coords", coordsArray);
+
+    QJsonDocument jsonDoc(resultObject);
+    return jsonDoc.toJson(QJsonDocument::Indented);
+}
+
 void MyTcpServer::slotReadyRead()
 {
     Socket = (QTcpSocket*)sender();
@@ -78,15 +115,23 @@ void MyTcpServer::slotReadyRead()
             if (!db.open())
             {
                 qDebug() << "Failed to connect to the database" << db.lastError().text();
-            } else
+                //отправка сообщения об ошибке подключения
+            }
+            else
             {
                 qDebug() << "Succesfully connected!";
+                //запрос
+                QString result = getLatestCoords(1);
+                qDebug() << result;
+
+
+                //упаковка
+
+                //отправка
+                SendToClient(result, socketDescriptor);
+                db.close();
             }
 
-
-
-
-            SendToClient("", socketDescriptor);
             break;
         }
     }
