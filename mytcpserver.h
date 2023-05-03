@@ -18,7 +18,7 @@ private:
     QVector <QTcpSocket*> sockets;
     QByteArray Data;
     quint16 nextBlockSize = 0;//размер блока данных
-    QString getLatestCoords(int roomId);
+    QJsonObject getLatestCoords(int roomId, QDateTime time, int interval);
     void SendToClient(QString str, qintptr socketDescriptor);
 
 public slots:

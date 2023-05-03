@@ -34,23 +34,37 @@ void MyTcpServer::incomingConnection(qintptr socketDescriptor)
     qDebug() << "connected " << Socket->socketDescriptor();
 }
 
-QString MyTcpServer::getLatestCoords(int roomId)
+QJsonObject MyTcpServer::getLatestCoords(int roomId, QDateTime time, int interval = 60)//интервал - отрезок от начала промежутка врмени
+                                                                                          //за который получаем координаты до конца
 {
     QSqlDatabase db = QSqlDatabase::database(); // получаем активное подключение к базе данных
 
-    // запрос для получения самых свежих координат каждого устройства с фильтрацией по room_id
-    QString queryStr = "SELECT DISTINCT ON (device_id) "
-                       "devices.mac_address, devices.name, coordinates.x, coordinates.y, coordinates.room_id, coordinates.timestamp "
-                       "FROM coordinates "
-                       "JOIN devices ON coordinates.device_id = devices.id "
-                       "WHERE coordinates.room_id = :roomId "
-                       "ORDER BY device_id, timestamp DESC;";
+    // запрос для получения координат устройств в заданном помещении, записанных не более чем за 1 минуту до указанного времени
+    QString queryStr = "SELECT DISTINCT ON(devices.mac_address) "
+            "devices.mac_address, "
+            "devices.name, "
+            "coordinates.x, "
+            "coordinates.y, "
+            "coordinates.room_id, "
+            "coordinates.timestamp "
+        "FROM "
+            "coordinates "
+        "JOIN devices ON coordinates.device_id = devices.id "
+        "WHERE "
+            "coordinates.room_id = :roomId AND "
+            "coordinates.timestamp > :timeFrom AND "
+            "coordinates.timestamp < :timeTo "
+        "ORDER BY "
+            "devices.mac_address, coordinates.timestamp DESC;";
 
     QSqlQuery query(db);
     query.prepare(queryStr);
     query.bindValue(":roomId", roomId);
+    query.bindValue(":timeFrom", time.addSecs(-interval)); // отнимаем количество секунд от заданного времени
+    query.bindValue(":timeTo", time);
     query.exec();
 
+    //пакуем каждый объект в элемент массива json
     QJsonArray coordsArray;
     while (query.next())
     {
@@ -64,11 +78,11 @@ QString MyTcpServer::getLatestCoords(int roomId)
         coordsArray.append(coordObject);
     }
 
+    //заполняем файл json массивом
     QJsonObject resultObject;
     resultObject.insert("coords", coordsArray);
 
-    QJsonDocument jsonDoc(resultObject);
-    return jsonDoc.toJson(QJsonDocument::Indented);
+    return resultObject;
 }
 
 void MyTcpServer::slotReadyRead()
@@ -82,7 +96,6 @@ void MyTcpServer::slotReadyRead()
     {
         while(true)
         {
-
             //достаточно ли данных для чтения размера блока
             if (Socket->bytesAvailable() < (int)sizeof(quint32))
             {
@@ -91,7 +104,8 @@ void MyTcpServer::slotReadyRead()
             //если да, то читаем блок
             quint32 size;
             QDataStream in(Socket);
-            input >> size;
+            in >> size;
+            qDebug() << size;
             //если блок пришел целиком
             if (Socket->bytesAvailable() < size)
             {
@@ -101,37 +115,60 @@ void MyTcpServer::slotReadyRead()
             QString str;
             input >> str;
             qDebug() << str;
-            //qDebug()<<Generator.createJsonData();
-
-            // Создаем подключение к базе данных PostgreSQL
-            QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL");
-            db.setHostName("localhost");
-            db.setPort(1111);
-            db.setDatabaseName("Coords");
-            db.setUserName("generator");
-            db.setPassword("1234");
-
-            // Открываем подключение к базе данных
-            if (!db.open())
+            if(str != "")
             {
-                qDebug() << "Failed to connect to the database" << db.lastError().text();
-                //отправка сообщения об ошибке подключения
+
+                QDateTime DateTime;
+                try
+                {
+                    //пытаемся конвертировать
+                    DateTime = QDateTime::fromString(str, "dd.MM.yyyy H:mm:ss");
+                    qDebug() << DateTime;
+                }
+                catch(...)
+                {
+                    //если не конвертировалось то выходим
+                    break;
+                }
+                //qDebug()<<Generator.createJsonData();
+
+                // Создаем подключение к базе данных PostgreSQL
+                QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL");
+                db.setHostName("localhost");
+                db.setPort(1111);
+                db.setDatabaseName("Coords");
+                db.setUserName("generator");
+                db.setPassword("1234");
+
+                // Открываем подключение к базе данных
+                if (!db.open())
+                {
+                    qDebug() << "Failed to connect to the database" << db.lastError().text();
+                    //отправка сообщения об ошибке подключения
+                }
+                else
+                {
+                    qDebug() << "Succesfully connected!";
+                    //запрос
+                    QJsonObject resultObject = getLatestCoords(1, DateTime, 60);
+
+                    QJsonDocument jsonDoc(resultObject);
+                    //возвращаем в виде строки чтобы потом отправить
+                    QString result = jsonDoc.toJson(QJsonDocument::Indented);
+
+                    QJsonArray jsonCoords = resultObject["coords"].toArray();
+                    //проверяем чтобы не отправлять пустой json
+                    if(!jsonCoords.isEmpty())
+                    {
+                        qDebug() << result;
+                        //отправка
+                        SendToClient(result, socketDescriptor);
+
+                    }
+
+                    db.close();
+                }
             }
-            else
-            {
-                qDebug() << "Succesfully connected!";
-                //запрос
-                QString result = getLatestCoords(1);
-                qDebug() << result;
-
-
-                //упаковка
-
-                //отправка
-                SendToClient(result, socketDescriptor);
-                db.close();
-            }
-
             break;
         }
     }
@@ -143,7 +180,6 @@ void MyTcpServer::slotReadyRead()
 
 void MyTcpServer::SendToClient(QString str, qintptr socketDescriptor)
 {
-//    Data.clear();
     QByteArray jsonData = str.toUtf8();
     QByteArray data;
     QDataStream out(&data, QIODevice::WriteOnly);
