@@ -34,35 +34,34 @@ void MyTcpServer::incomingConnection(qintptr socketDescriptor)
     qDebug() << "connected " << Socket->socketDescriptor();
 }
 
-QJsonObject MyTcpServer::getLatestCoords(int roomId, QDateTime time, int interval = 60)//интервал - отрезок от начала промежутка врмени
+QJsonObject MyTcpServer::getLatestCoords(int areaId, QDateTime time, int interval = 60)//интервал - отрезок от начала промежутка врмени
                                                                                           //за который получаем координаты до конца
 {
     QSqlDatabase db = QSqlDatabase::database(); // получаем активное подключение к базе данных
 
-    // запрос для получения координат устройств в заданном помещении, записанных не более чем за 1 минуту до указанного времени
-    QString queryStr = "SELECT DISTINCT ON(devices.mac_address) "
-            "devices.mac_address, "
-            "devices.name, "
-            "coordinates.x, "
-            "coordinates.y, "
-            "coordinates.room_id, "
-            "coordinates.timestamp "
-        "FROM "
-            "coordinates "
-        "JOIN devices ON coordinates.device_id = devices.id "
-        "WHERE "
-            "coordinates.room_id = :roomId AND "
-            "coordinates.timestamp > :timeFrom AND "
-            "coordinates.timestamp < :timeTo "
-        "ORDER BY "
-            "devices.mac_address, coordinates.timestamp DESC;";
+    QString queryStr = "SELECT DISTINCT ON (Devices.mac_address) "
+                       "Devices.mac_address, "
+                       "Devices.name, "
+                       "DevicesInAreas.X, "
+                       "DevicesInAreas.Y, "
+                       "DevicesInAreas.DateTime "
+                       "FROM Devices "
+                       "JOIN DevicesInAreas ON Devices.id = DevicesInAreas.DeviceId "
+                       "WHERE DevicesInAreas.AreaId = :areaId "
+                       "AND DevicesInAreas.DateTime > :timeFrom "
+                       "AND DevicesInAreas.DateTime < :timeTo "
+                       "ORDER BY Devices.mac_address, DevicesInAreas.DateTime DESC;";
 
     QSqlQuery query(db);
     query.prepare(queryStr);
-    query.bindValue(":roomId", roomId);
-    query.bindValue(":timeFrom", time.addSecs(-interval)); // отнимаем количество секунд от заданного времени
+    query.bindValue(":areaId", areaId);
+    query.bindValue(":timeFrom", time.addSecs(-interval));
     query.bindValue(":timeTo", time);
-    query.exec();
+
+    if(!query.exec())
+    {
+        qDebug() << "Failed to connect to the database" << db.lastError().text();;
+    }
 
     //пакуем каждый объект в элемент массива json
     QJsonArray coordsArray;
@@ -73,14 +72,15 @@ QJsonObject MyTcpServer::getLatestCoords(int roomId, QDateTime time, int interva
         coordObject.insert("name", query.value(1).toString());
         coordObject.insert("x", query.value(2).toDouble());
         coordObject.insert("y", query.value(3).toDouble());
-//        coordObject.insert("roomId", query.value(4).toInt());
-        coordObject.insert("dateTime", query.value(5).toDateTime().toString(Qt::ISODate));
+        coordObject.insert("dateTime", query.value(4).toDateTime().toString(Qt::ISODate));
+        qDebug() << query.value(4).toDateTime().toString(Qt::ISODate);
         coordsArray.append(coordObject);
     }
 
     //заполняем файл json массивом
     QJsonObject resultObject;
     resultObject.insert("coords", coordsArray);
+
 
     return resultObject;
 }
