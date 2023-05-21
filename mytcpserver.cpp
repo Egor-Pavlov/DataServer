@@ -22,6 +22,11 @@ MyTcpServer::MyTcpServer()
     {
         qDebug() << "server is not started";
     }
+
+//    Endpoints.append(std::make_pair("get/token/", GetTokenHAndler));
+//    Endpoints.append(std::make_pair("Функция 2", function2));
+//    Endpoints.append(std::make_pair("Функция 3", function3));
+
 }
 
 void MyTcpServer::incomingConnection(qintptr socketDescriptor)
@@ -113,8 +118,19 @@ void MyTcpServer::slotReadyRead()
             }
 
             QString str;
+            //выписали запрос
             input >> str;
             qDebug() << str;
+
+
+            if(СheckGetPrefix(str))
+            {
+                //проверяем что запрос из известных
+
+                //передаем параметры в обработчик запроса
+            }
+
+
             if(str != "")
             {
 
@@ -175,6 +191,22 @@ void MyTcpServer::slotReadyRead()
     else
     {
         qDebug() << "DataStream err";
+    }
+}
+
+//удаляем префикс get/
+bool MyTcpServer::СheckGetPrefix(QString& str)
+{
+    // Приводим строку к нижнему регистру для независимого сравнения
+    str = str.toLower();
+
+    QString prefix = "get/";
+    // Сравниваем префикс с началом строки
+    if (str.startsWith(prefix, Qt::CaseInsensitive))
+    {
+        // Удаляем префикс из строки
+        str.remove(0, prefix.length());
+        return true;
     }
 }
 
