@@ -9,9 +9,7 @@
 #include <QSqlError>
 #include <QSqlQuery>
 
-HttpServer::HttpServer(QObject *parent) : QObject(parent), tcpServer(nullptr)
-{
-}
+HttpServer::HttpServer(QObject *parent) : QObject(parent), tcpServer(nullptr){}
 
 HttpServer::~HttpServer()
 {
@@ -23,14 +21,12 @@ void HttpServer::startServer()
     {
         tcpServer = new QTcpServer(this);
         connect(tcpServer, &QTcpServer::newConnection, this, &HttpServer::handleConnection);
-        //Endpoints.append(std::make_pair("GET /api/positions", getPositionHandle));
-        //Endpoints["GET /api/positions"] = &HttpServer::getPositionHandle;
+//привзяка маршрутов API к обработчикам
         Endpoints.insert("GET /api/positions", std::bind(&HttpServer::getPositionHandle, this, std::placeholders::_1));
         Endpoints.insert("GET /api/token", std::bind(&HttpServer::getTokenHandle, this, std::placeholders::_1));
         Endpoints.insert("GET /api/plan", std::bind(&HttpServer::getPlanHandle, this, std::placeholders::_1));
         Endpoints.insert("GET /api/buildings", std::bind(&HttpServer::getBuildingsHandle, this, std::placeholders::_1));
         Endpoints.insert("GET /api/arealist", std::bind(&HttpServer::getAreaListHandle, this, std::placeholders::_1));
-
 
         // Создаем подключение к базе данных PostgreSQL
         db = QSqlDatabase::addDatabase("QPSQL");
@@ -87,7 +83,6 @@ void HttpServer::stopServer()
     }
 }
 
-
 //проверяем наличие sql инъекций в логине или пароле
 bool HttpServer::hasSqlInjection(const QString& input)
 {
@@ -141,6 +136,7 @@ QString HttpServer::getAreaList(const QString &token, const int& buildingId)
         jsonObject["buildingId"] = query.value(2).toInt();
         jsonArray.append(jsonObject);
     }
+    UpdateLastActive(token);
 
     QJsonObject result;
     result["code"] = 200;
@@ -278,7 +274,7 @@ QString HttpServer::getBuildingsList(const QString &token)
         jsonObject["longitude"] = query.value(4).toDouble();
         jsonArray.append(jsonObject);
     }
-
+    UpdateLastActive(token);
     QJsonObject result;
     result["code"] = 200;
     result["buildings"] = jsonArray;
@@ -363,9 +359,7 @@ QString HttpServer::getPlan(const QString &token, const int &areaId)
     {
         qDebug() << "Failed to retrieve the plan image from the database.";
         return "{\n    \"code\": 404\n}\n";
-
     }
-
 }
 
 //обработка запроса плана
@@ -421,7 +415,6 @@ QString HttpServer::getPlanHandle(const QString &params)
     }
 }
 
-
 QString HttpServer::generateUserToken()
 {
     const QString characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -444,7 +437,6 @@ QString HttpServer::generateUserToken()
 
     return token;
 }
-
 
 QString HttpServer::getTokenHandle(const QString &params)
 {
@@ -532,7 +524,6 @@ QString HttpServer::getTokenHandle(const QString &params)
         qDebug() << "Unknown exception caught";
     }
 }
-
 
 QByteArray HttpServer::createHttpResponse(const QString& content)
 {
@@ -638,7 +629,6 @@ void HttpServer::handleDisconnection()
     }
 }
 
-
 QString HttpServer::extractApiRequest(const QByteArray& requestData)
 {
     // Находим позицию начала API-запроса
@@ -727,7 +717,6 @@ void HttpServer::UpdateLastActive(const QString &token)
 
 
 }
-
 
 QString HttpServer::getLatestCoords(const QString &token, const int &areaId, QDateTime time, int interval = 60)//интервал - отрезок от начала промежутка врмени
                                                                                           //за который получаем координаты до конца
