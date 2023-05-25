@@ -72,6 +72,7 @@ bool HttpServer::isTokenValid(const QString& token)
         }
         else return true;
     }
+    return false;
 }
 
 void HttpServer::stopServer()
@@ -351,6 +352,7 @@ QString HttpServer::getPlan(const QString &token, const int &areaId)
         QJsonDocument jsonDoc;
         QJsonObject jsonObj;
         jsonObj["image"] = QString::fromLatin1(imageData.toBase64());
+        jsonObj["code"] = 200;
         jsonDoc.setObject(jsonObj);
         UpdateLastActive(token);
         return jsonDoc.toJson();
@@ -491,7 +493,18 @@ QString HttpServer::getTokenHandle(const QString &params)
                     {
                         // Запрос выполнен успешно
                         qDebug() << "Token and last_active updated for user:" << username;
-                        return "{\n    \"code\": 200\n    \"token\": " + token + "\n}\n";
+
+                        //заполняем файл json массивом
+                        QJsonObject resultObject;
+                        resultObject.insert("code", 200);
+                        resultObject.insert("token", token);
+
+                        QJsonDocument jsonDoc(resultObject);
+                        //возвращаем в виде строки чтобы потом отправить
+                        QString result = jsonDoc.toJson(QJsonDocument::Indented);
+                        return result;
+
+                        //return "{\n    \"code\": 200,\n    \"token\": " + token + "\n}\n";
                     }
                     else
                     {
