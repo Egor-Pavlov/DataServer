@@ -158,6 +158,10 @@ QString HttpServer::getAreaListHandle(const QString &params)
         {
             QString token = Params[0].split("=")[1];
             int buildingId = Params[1].split("=")[1].toInt();
+            if (buildingId < 1)
+            {
+                return "{\n    \"code\": 404\n}\n";
+            }
             //проверка токена на наличие sql инъекций
             if(hasSqlInjection(token))
             {
@@ -375,6 +379,8 @@ QString HttpServer::getPlanHandle(const QString &params)
         {
             QString token = Params[0].split("=")[1];
             int areaId = Params[1].split("=")[1].toInt();
+            if (areaId < 1)
+                return "{\n    \"code\": 404\n}\n";
             //проверка токена на наличие sql инъекций
             if(hasSqlInjection(token))
             {
@@ -455,7 +461,7 @@ QString HttpServer::getTokenHandle(const QString &params)
             if(hasSqlInjection(username) || hasSqlInjection(password))
             {
                 qDebug() << "Detected sql symbols in params value. Operation denyed";
-                return "";
+                return "{\n    \"code\": 403\n}\n";
             }
 
             //проверка совпадения в базе
@@ -469,7 +475,7 @@ QString HttpServer::getTokenHandle(const QString &params)
             // Выполнение запроса и получение результата
             if (!query.exec()) {
                 qWarning() << "Не удалось выполнить запрос";
-                return "";
+                return "{\n    \"code\": 404\n}\n";
             }
 
             // Получение результата проверки
